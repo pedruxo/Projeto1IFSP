@@ -1,0 +1,72 @@
+from Bard import Chatbot
+from playsound import playsound
+import speech_recognition as sr
+import whisper
+import sys
+
+# É necessário copiar e colar os tokens de segurança aqui
+token1 = ''
+token2 = ''
+
+chatbot = Chatbot(token1, token2)
+r = sr.Recognizer()
+
+tiny_model = whisper.load_model('tiny')
+base_model = whisper.load_model('base')
+
+# Se a plataforma não for MacOS
+if sys.platform != "darwin":
+    import pyttsx3
+    engine = pyttsx3.init()
+    rate = engine.getProperty("rate")
+    engine.setProperty("rate", rate - 30)
+
+def prompt_bard(prompt):
+    resposta = chatbot.ask(prompt)
+    return resposta['content']
+
+def main():
+    with sr.Microphone() as source:
+        r.adjust_for_ambient_noise(source)
+        while True:
+            while True:
+                try:
+                    print('\nDiga "Sabidinho" para ligar. \n')
+                    audio = r.listen(source)
+                    
+                    with open("wake_detector.wav", "wb") as f:
+                        f.write(audio.get_wav_data())
+                    
+                    result = tiny_model.transcribe('wake_detect.wav')
+                    text_input = result['text']
+
+                    if 'sabidinho' in text_input.lower().strip():
+                        break
+                    else:
+                        print("Não foi possível ligar. Tente novamente.")
+                
+                except Exception as e:
+                    print("Erro ao transcrever o áudio: ", e)
+                continue
+            
+            try:
+                playsound("wake_detected.mp3")
+                print("Palavra detectada. Pergunte algo.")
+                audio = r.listen(source)
+
+                with open("prompt.wav", "wb") as f:
+                    f.write(audio.get_wav_data())
+                
+                result = base_model.transcribe("prompt.wav")
+                text_input = result['text']
+
+            except Exception as e:
+                print("Erro ao transcrever o áudio: ", e)
+                continue
+
+            resposta = prompt_bard(text_input)
+
+            if sys.platform.startswith('win'):
+                print("Bard: ", resposta)
+            
+            speak(resposta)
